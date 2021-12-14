@@ -1,44 +1,52 @@
-const https = require('https');
-const Web3 = require('web3');
-
 require('dotenv').config() ;
+const { ALCHEMY_API_KEY, CONTRACT_ADDRESS, WALLET } = process.env;
 
-const { POLYGON_API_KEY, WALLET } = process.env;
-console.log(process.env)
+const https = require('https');
+const { ethers } = require('ethers');
+const ContractABI = require('./contracts/RKPRIM.json');
 
-const lastBlock = '';
+let lastBlock = 1;
+let contract = null;
 
 console.log(`starting scan_pusher wallet: ${WALLET}`)
 
-const getBalance = () => {
-  https.get(`https://api.polygonscan.com/api?module=account&action=balance&address=${WALLET}&tag=latest&apikey=${POLYGON_API_KEY}`, res => {
-    let data = [];
-    const headerDate = res.headers && res.headers.date ? res.headers.date : 'no response date';
-    console.log('Status Code:', res.statusCode);
-    console.log('Date in Response header:', headerDate);
+const httpsGet = async (url) => {
+  return new Promise((resolve, reject) => {
+    https.get(url, res => {
+      let data = [];
+      console.log('Status Code:', res.statusCode);
 
-    res.on('data', chunk => {
-      data.push(chunk);
+      res.on('data', chunk => {
+        data.push(chunk);
+      });
+
+      res.on('end', () => {
+        console.log('Response ended: ');
+        console.log(JSON.parse(Buffer.concat(data).toString()));
+        resolve(JSON.parse(Buffer.concat(data).toString()))
+      });
+
+    }).on('error', err => {
+      console.log('Error: ', err.message);
+      reject(err);
     });
-
-    res.on('end', () => {
-      console.log('Response ended: ');
-      console.log(JSON.parse(Buffer.concat(data).toString()).result);
-
-      const { status, result } = JSON.parse(Buffer.concat(data).toString());
-
-      if (status === '1') {
-        console.log(result);
-      }
-    });
-  }).on('error', err => {
-    console.log('Error: ', err.message);
   });
+}
 
+const getBalance = () => {
+  // todo - replace with alchemy to get that contract balance
+  
 }
 
 const getTransactions = () => {
-
+  const result = httpsGet(`https://api.polygonscan.com/api?module=account&action=txlist&address=${WALLET}&startblock=${lastBlock}&endblock=99999999&sort=asc&apikey=${POLYGON_API_KEY}`)
+  
+  result.then(
+    (response) => {
+      console.log(response.result);
+    }, () => {
+      console.log('error')
+    });
 }
 
 const getLastBlockAccess = () => {
@@ -65,4 +73,22 @@ const callSplitterContract = () => {
 // get transactions from last block access onwards
 // iterate for each transaction, if artist id / nft contract id is in database
 
-getBalance(); // testing
+const main = async () => {
+  const customHttpProvider = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
+  
+  const signer = customHttpProvider.getSigner();
+  const contract = new ethers.Contract(
+    CONTRACT_ADDRESS,
+    ContractABI,
+    signer
+  );
+
+  const balance = ethers.utils.formatEther(await customHttpProvider.getBalance(CONTRACT_ADDRESS))
+
+  console.log('contract balance', balance);
+
+  // listen for events
+  
+}
+
+main();
