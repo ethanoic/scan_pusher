@@ -1,0 +1,29 @@
+{
+  "name": "scan_pusher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./index.js",
+  "scripts": {
+    "start": "node ./index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethanoic/scan_pusher.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ethanoic/scan_pusher/issues"
+  },
+  "homepage": "https://github.com/ethanoic/scan_pusher#readme",
+  "devDependencies": {
+    "@types/node": "^16.11.12",
+    "tslint": "^5.12.1",
+    "typescript": "^3.3.3"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "web3": "^1.6.1"
+  }
+}
