@@ -2,7 +2,7 @@ require('dotenv').config() ;
 let mysql = require('mysql');
 const { ethers } = require('ethers');
 const Web3 = require('web3');
-const ContractABI = require('./contracts/RKPRIM.json');
+const ContractABI = require('./abi/RKPRIM.json');
 
 const { 
   ALCHEMY_API_KEY, 
