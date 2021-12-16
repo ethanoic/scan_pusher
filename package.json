@@ -24,9 +24,12 @@
   },
   "dependencies": {
     "@alch/alchemy-web3": "^1.1.9",
+    "@sentry/node": "^6.16.1",
+    "@sentry/tracing": "^6.16.1",
     "decimal.js": "^10.3.1",
     "dotenv": "^10.0.0",
     "ethers": "^5.5.2",
+    "log-to-file": "^3.0.0",
     "mysql": "^2.18.1",
     "web3": "^1.6.1"
   }

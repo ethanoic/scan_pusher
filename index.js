@@ -1,9 +1,27 @@
 require('dotenv').config() ;
+const Sentry = require("@sentry/node");
+// or use es6 import statements
+// import * as Sentry from '@sentry/node';
+
+const Tracing = require("@sentry/tracing");
+// or use es6 import statements
+// import * as Tracing from '@sentry/tracing';
+
+Sentry.init({
+  dsn: "https://44d604aa410c4cd1a5d31f1689555792@o247622.ingest.sentry.io/6109731",
+
+  // Set tracesSampleRate to 1.0 to capture 100%
+  // of transactions for performance monitoring.
+  // We recommend adjusting this value in production
+  tracesSampleRate: 1.0,
+});
+
 let mysql = require('mysql');
 const { ethers } = require('ethers');
 const Web3 = require('web3');
 const ContractABI = require('./abi/RKPRIM.json');
 const process = require('process');
+const log = require('log-to-file');
 
 const { 
   ALCHEMY_API_KEY, 
@@ -15,7 +33,8 @@ const {
   MYSQL_DB,
   MYSQL_TABLE,
   TRANSACTION_CONFIRMATION_MIN,
-  TRANSACTION_CONFIRMATION_RETRY_INTERVAL
+  TRANSACTION_CONFIRMATION_RETRY_INTERVAL,
+  DEPOSIT_WITHDRAW_BLOCK_WAIT
 } = process.env;
 
 let connection;
@@ -33,25 +52,46 @@ function validateTransaction(trx) {
 /**
  * Calls the smart contract splitter
  */
-const callSmartContract = (contractAddress) => {
-  if (contractAddress === '' || contractAddress === null) {
-    console.log('error, smart contract address empty');
-    return;
+const callSmartContract = async (contractAddress) => {
+  const transaction = Sentry.startTransaction({
+    op: "callSmartContract",
+    name: "Trigger smart contract",
+  });
+
+  try {
+      
+    if (contractAddress === '' || contractAddress === null) {
+      throw 'error, smart contract address empty';
+      return;
+    }
+
+    const customHttpProvider = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
+    const signer = customHttpProvider.getSigner();
+    const contract = new ethers.Contract(
+      contractAddress,
+      ContractABI,
+      signer
+    );
+    
+    const tx = await contract.distribute();
+
+    const blockNumber = tx.blockNumber;
+    
+    // wait for distribute to complete after n blocks
+    const intId = setInterval(async () => {
+      const currentBlock = await web3Http.eth.getBlockNumber();
+
+      if (currentBlock - blockNumber >= DEPOSIT_WITHDRAW_BLOCK_WAIT) {
+        clearInterval(intId);
+        await contract.withdraw();
+      }
+    }, 30 * 1000);
+    
+  } catch (e) {
+    Sentry.captureException(e);
+  } finally {
+    transaction.finish();
   }
-
-  const customHttpProvider = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
-  const signer = customHttpProvider.getSigner();
-  const contract = new ethers.Contract(
-    contractAddress,
-    ContractABI,
-    signer
-  );
-  contract.distribute();
-
-  // wait for distribute to complete, 8 blocks
-
-
-  contract.withdraw();
 }
 
 /**
@@ -61,53 +101,64 @@ const callSmartContract = (contractAddress) => {
  * Actions on confirmed transaction
  */
 const actionOnConfirmedTransaction = (txReceipt) => {
-  const logs = txReceipt.logs;
-/*
-  if (logs.length == 0) {
-    console.log('error - tx logs is empty')
-    return;
-  }
+  const transaction = Sentry.startTransaction({
+    op: "actionOnConfirmedTransaction",
+    name: "action on transaction receipt",
+  });
 
-  if (logs[0].topics.length >= 3) {
-    console.log('error - tx topics insufficient')
-    return;
-  }
-*/
-  // const nftId = web3Http.utils.toBN(logs[0].topics[3]).toString();
-  const nftId = '3333'; // test locally
+  try {
+    const logs = txReceipt.logs;
 
-  if (nftId === '' || nftId === null) {
-    console.log('error NFT Id not found');
-    return;
-  }
-
-  // query MySQL DB for contract address and artist address
-  if (connection == undefined) {
-    console.log('No DB connection available')
-    return;
-  }
-
-  connection.query('SELECT smartContract FROM ' + MYSQL_TABLE + ' WHERE TokenID = ?', 
-    [nftId],
-    (err, results, fields) => {
-      if (err) {
-        console.log(err.message)
-      }
-      
-      if (results.length === 1) {
-        const smartContract = results[0].smartContract;
-        callSmartContract(smartContract);
-      }
+    if (logs.length == 0) {
+      console.log('error - tx logs is empty')
+      throw txReceipt.hash + ' tx logs is empty'
+      return;
     }
-  );
 
+    if (logs[0].topics.length >= 3) {
+      console.log('error - tx topics insufficient')
+      throw txReceipt.hash + ' tx topics insufficient'
+      return;
+    }
+
+    const nftId = web3Http.utils.toBN(logs[0].topics[3]).toString();
+    
+    if (nftId === '' || nftId === null) {
+      console.log('error NFT Id not found');
+      throw 'NFT Id not found'
+      return;
+    }
+
+    // query MySQL DB for contract address and artist address
+    if (connection == undefined) {
+      console.log('No DB connection available')
+      throw 'DB connection available'
+      return;
+    }
+
+    connection.query('SELECT smartContract FROM ' + MYSQL_TABLE + ' WHERE TokenID = ?', 
+      [nftId],
+      (err, results, fields) => {
+        if (err) {
+          console.log(err.message)
+          throw err.message
+        }
+        
+        if (results.length === 1) {
+          const smartContract = results[0].smartContract;
+          callSmartContract(smartContract);
+        }
+      }
+    );
+  } catch (e) {
+    Sentry.captureException(e);
+  } finally {
+    transaction.finish();
+  }
 }
 
 async function getConfirmations(txHash) {
   try {
-    // Instantiate web3 with HttpProvider
-    //const web3 = new Web3(ALCHEMY_API_KEY);
-
     // Get transaction details
     const trx = await web3Http.eth.getTransaction(txHash);
 
@@ -125,8 +176,6 @@ async function getConfirmations(txHash) {
 
 async function getTransactionReceipt(txHash) {
   try {
-    // const web3 = new Web3(ALCHEMY_API_KEY);
-
     return await web3Http.getTransactionReceipt(txHash);
   } catch (error) {
     console.log(error)
@@ -162,6 +211,7 @@ function confirmTransaction(txHash, confirmations = TRANSACTION_CONFIRMATION_MIN
       // Handle confirmation event according to your business logic
       
       console.log('Transaction with hash ' + txHash + ' has been successfully confirmed')
+      log(txHash + ' confirmed');
       
       actionOnConfirmedTransaction(receipt);
 
@@ -174,67 +224,56 @@ function confirmTransaction(txHash, confirmations = TRANSACTION_CONFIRMATION_MIN
 }
 
 const main = async () => {
-  connection = mysql.createConnection({
-    host: MYSQL_HOST,
-    user: MYSQL_USERNAME,
-    password: MYSQL_PASSWORD,
-    database: MYSQL_DB
+  log('started');
+  const transaction = Sentry.startTransaction({
+    op: "main",
+    name: "starting main code",
   });
 
-  connection.connect(function(err) {
-    if (err) {
-      return console.error('error: ' + err.message);
-    }
+  try {
+    connection = mysql.createConnection({
+      host: MYSQL_HOST,
+      user: MYSQL_USERNAME,
+      password: MYSQL_PASSWORD,
+      database: MYSQL_DB
+    });
   
-    console.log('Connected to the MySQL server.', MYSQL_HOST);
-
-    /*
-    web3Http = new Web3(ALCHEMY_API_KEY);
-    const web3 = new Web3(ALCHEMY_WEB_SOCKET);
-    var subscription = web3.eth.subscribe('pendingTransactions');
-
-    subscription.subscribe(async (error, txHash) => {
-      if (error) { 
-        console.log('error', error) 
-        return;
+    connection.connect(function(err) {
+      if (err) {
+        return console.error('error: ' + err.message);
       }
-
-      const trx = await web3Http.eth.getTransaction(txHash);
-
-      const valid = validateTransaction(trx);
-      // If transaction is not valid, simply return
-      if (!valid) return
-
-      console.log('Transaction hash is: ' + txHash + '\n');
-
-      confirmTransaction(txHash);
-
-      subscription.unsubscribe();
-    })
-*/
     
-    web3Http = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
-    const wsProvider = new ethers.providers.WebSocketProvider(ALCHEMY_WEB_SOCKET);
-    var subscription = wsProvider.on('pending', async (txHash) => {
-      const trx = await web3Http.getTransaction(txHash);
-
-      const valid = validateTransaction(trx);
-      // If transaction is not valid, simply return
-      if (!valid) return
-
-      console.log('Transaction hash is: ' + txHash + '\n');
-
-      confirmTransaction(txHash);
-    })
-
-  });
-
+      console.log('Connected to the MySQL server.', MYSQL_HOST);
+  
+      web3Http = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
+      const wsProvider = new ethers.providers.WebSocketProvider(ALCHEMY_WEB_SOCKET);
+      var subscription = wsProvider.on('pending', async (txHash) => {
+        const trx = await web3Http.getTransaction(txHash);
+  
+        const valid = validateTransaction(trx);
+        // If transaction is not valid, simply return
+        if (!valid) return
+  
+        console.log('Transaction hash is: ' + txHash + '\n');
+        log(txHash + ' pending');
+  
+        confirmTransaction(txHash);
+      })
+  
+    });
+  
+  } catch (e) {
+    Sentry.captureException(e);
+  } finally {
+    transaction.finish();
+  }
 }
 
 main();
 
 process.on('beforeExit', () => {
   connection.destroy();
+  log('exit');
 })
 
 console.log('press any key to exit')
