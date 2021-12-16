@@ -1,4 +1,4 @@
-
+require('dotenv').config() ;
 const ethers = require("ethers");
 const ContractABI = require('../abi/RKPRIM.json');
 /**
@@ -9,8 +9,7 @@ const main = async () => {
   const wsProvider = new ethers.providers.WebSocketProvider(process.env.ALCHEMY_WEB_SOCKET);
 
   const contractAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
-
-  const signer = provider.getSigner();
+  const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const contract = new ethers.Contract(
     contractAddress,
     ContractABI,
@@ -20,6 +19,8 @@ const main = async () => {
   console.log(ethers.BigNumber.from(await contract.totalFundsDistributed()).toString());
 
   console.log(await contract.distribute());
+
+  console.log(await contract.withdraw());
 }
 
 main()

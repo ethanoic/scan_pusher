@@ -15,6 +15,7 @@ Listens for pending transactions on a given wallet and execute calling a contrac
   TRANSACTION_CONFIRMATION_MIN=min confirmation blocks required
   TRANSACTION_CONFIRMATION_RETRY_INTERVAL=seconds to retry confirmation check of the pending transaction
   DEPOSIT_WITHDRAW_BLOCK_WAIT=number of blocks to wait before calling withdraw
+  SENTRY_DSN=your sentry DSN
 
   MYSQL_HOST=mysql database host
   MYSQL_USERNAME=mysql username

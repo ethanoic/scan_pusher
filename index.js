@@ -1,21 +1,6 @@
 require('dotenv').config() ;
 const Sentry = require("@sentry/node");
-// or use es6 import statements
-// import * as Sentry from '@sentry/node';
-
 const Tracing = require("@sentry/tracing");
-// or use es6 import statements
-// import * as Tracing from '@sentry/tracing';
-
-Sentry.init({
-  dsn: "https://44d604aa410c4cd1a5d31f1689555792@o247622.ingest.sentry.io/6109731",
-
-  // Set tracesSampleRate to 1.0 to capture 100%
-  // of transactions for performance monitoring.
-  // We recommend adjusting this value in production
-  tracesSampleRate: 1.0,
-});
-
 let mysql = require('mysql');
 const { ethers } = require('ethers');
 const Web3 = require('web3');
@@ -27,6 +12,7 @@ const {
   ALCHEMY_API_KEY, 
   ALCHEMY_WEB_SOCKET, 
   LISTEN_ADDRESS,
+  PRIVATE_KEY,
   MYSQL_HOST,
   MYSQL_USERNAME,
   MYSQL_PASSWORD,
@@ -34,8 +20,20 @@ const {
   MYSQL_TABLE,
   TRANSACTION_CONFIRMATION_MIN,
   TRANSACTION_CONFIRMATION_RETRY_INTERVAL,
-  DEPOSIT_WITHDRAW_BLOCK_WAIT
+  DEPOSIT_WITHDRAW_BLOCK_WAIT,
+  SENTRY_DSN
 } = process.env;
+
+
+Sentry.init({
+  dsn: SENTRY_DSN,
+
+  // Set tracesSampleRate to 1.0 to capture 100%
+  // of transactions for performance monitoring.
+  // We recommend adjusting this value in production
+  tracesSampleRate: 1.0,
+});
+
 
 let connection;
 let web3Http;
@@ -66,7 +64,7 @@ const callSmartContract = async (contractAddress) => {
     }
 
     const customHttpProvider = new ethers.providers.JsonRpcProvider(ALCHEMY_API_KEY);
-    const signer = customHttpProvider.getSigner();
+    const signer = new ethers.Wallet(PRIVATE_KEY, customHttpProvider);
     const contract = new ethers.Contract(
       contractAddress,
       ContractABI,
