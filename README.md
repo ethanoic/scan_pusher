@@ -10,6 +10,7 @@ Listens for pending transactions on a given wallet and execute calling a contrac
 4. Configure environment settings
 
   LISTEN_ADDRESS=wallet address to subscribe to
+  PRIVATE_KEY=wallet address private key for executing the contract write methods
   ALCHEMY_API_KEY=alchemy api key
   ALCHEMY_WEB_SOCKET=alchemy web socket
   TRANSACTION_CONFIRMATION_MIN=min confirmation blocks required
