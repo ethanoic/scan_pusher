@@ -1,28 +1,40 @@
 # Scan Pusher
 
-Listens for pending transactions on a given wallet and execute calling a contract address and methods
+Listens for pending transactions on a given wallet, waits for them to be confirmed and execute calling a contract address and methods. calls the splitting contract distribute, waits for n blocks confirmation and calls withdraw
 
 ## Setup:
 
 1. Clone the project to your local drive
 2. run `npm i` to install dependecies
 3. Duplicate `.env.example` to `.env`
-4. Configure environment settings
+4. Configure environment settings as follows
 
-  LISTEN_ADDRESS=wallet address to subscribe to
-  PRIVATE_KEY=wallet address private key for executing the contract write methods
-  ALCHEMY_API_KEY=alchemy api key
-  ALCHEMY_WEB_SOCKET=alchemy web socket
-  TRANSACTION_CONFIRMATION_MIN=min confirmation blocks required
-  TRANSACTION_CONFIRMATION_RETRY_INTERVAL=seconds to retry confirmation check of the pending transaction
-  DEPOSIT_WITHDRAW_BLOCK_WAIT=number of blocks to wait before calling withdraw
-  SENTRY_DSN=your sentry DSN
+      LISTEN_ADDRESS=wallet address to subscribe to
 
-  MYSQL_HOST=mysql database host
-  MYSQL_USERNAME=mysql username
-  MYSQL_PASSWORD=mysq lpassword
-  MYSQL_DB=database name
-  MYSQL_TABLE=table to query for artist smart contract
+      PRIVATE_KEY=wallet address private key for executing the contract write methods
+
+      ALCHEMY_API_KEY=alchemy api key
+
+      ALCHEMY_WEB_SOCKET=alchemy web socket
+
+      TRANSACTION_CONFIRMATION_MIN=min confirmation blocks required
+      
+      TRANSACTION_CONFIRMATION_RETRY_INTERVAL=seconds to retry confirmation 
+      check of the pending transaction
+      
+      DEPOSIT_WITHDRAW_BLOCK_WAIT=number of blocks to wait before calling withdraw
+      
+      SENTRY_DSN=your sentry DSN
+
+      MYSQL_HOST=mysql database host
+      
+      MYSQL_USERNAME=mysql username
+      
+      MYSQL_PASSWORD=mysq lpassword
+      
+      MYSQL_DB=database name
+      
+      MYSQL_TABLE=table to query for artist smart contract
 
 5. copy the latest contract ABI.abi property value into `./abi/RKPRIM.json`
 6. run `npm run start` to start the pusher
